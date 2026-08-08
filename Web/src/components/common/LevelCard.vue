@@ -2,7 +2,7 @@
   <div class="level-card">
     <!-- 封面图片 -->
     <div class="card-image">
-      <img :src="level.image" :alt="level.song" @error="handleImageError" />
+      <img :src="imageSource" :alt="level.song" @error="handleImageError" />
       <div class="card-description">
         {{ level.description || '暂无描述' }}
       </div>
@@ -26,7 +26,10 @@
         </span>
         <span class="meta-item">
           <Clock :size="14" />
-          {{ level.min_bpm }} BPM
+          {{ bpmLabel }}
+        </span>
+        <span v-if="level.club?.name" class="meta-item">
+          {{ level.club.name }}
         </span>
       </div>
 
@@ -40,23 +43,13 @@
       <!-- 下载按钮 -->
       <div class="card-actions">
         <a
-          v-if="level.url2"
-          :href="getDownloadUrl(level.url2)"
+          :href="getDownloadUrl(level.id)"
           class="download-btn primary"
           target="_blank"
           rel="noopener noreferrer"
         >
           <Download :size="16" />
           下载谱面
-        </a>
-        <a
-          v-if="level.url && level.url2"
-          :href="getDownloadUrl(level.url)"
-          class="download-btn secondary"
-          target="_blank"
-          rel="noopener noreferrer"
-        >
-          备用下载
         </a>
       </div>
     </div>
@@ -76,6 +69,14 @@ const props = defineProps<{
 
 const difficultyLabel = computed(() => DIFFICULTY_LABELS[props.level.difficulty])
 const difficultyColor = computed(() => DIFFICULTY_COLORS[props.level.difficulty])
+const imageSource = computed(() => props.level.thumb_url || props.level.image_url || '/favicon.svg')
+const bpmLabel = computed(() => {
+  if (props.level.min_bpm === props.level.max_bpm) {
+    return `${props.level.min_bpm} BPM`
+  }
+
+  return `${props.level.min_bpm}-${props.level.max_bpm} BPM`
+})
 
 const authorName = computed(() => {
   return Array.isArray(props.level.authors)
@@ -87,13 +88,13 @@ const displayTags = computed(() => {
   return props.level.tags?.slice(0, 4) || []
 })
 
-const getDownloadUrl = (url: string) => {
-  return ApiService.getDownloadUrl(url)
+const getDownloadUrl = (id: string) => {
+  return ApiService.getDownloadUrl(id)
 }
 
 const handleImageError = (e: Event) => {
   const target = e.target as HTMLImageElement
-  target.src = 'https://s1.ax1x.com/2023/06/30/pCRPBA0.png'
+  target.src = '/favicon.svg'
 }
 </script>
 

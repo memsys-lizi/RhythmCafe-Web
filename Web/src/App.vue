@@ -7,7 +7,7 @@ import HomePage from './views/HomePage.vue'
 import AboutPage from './views/AboutPage.vue'
 import FiltersContent from './components/common/FiltersContent.vue'
 import { useRouter } from './composables/useRouter'
-import type { Filters, Facet } from './types'
+import type { FacetDistribution, Filters } from './types'
 
 // 路由
 const { currentPage, navigateTo } = useRouter()
@@ -16,7 +16,7 @@ const sidebarOpen = ref(false)
 const homePageRef = ref<InstanceType<typeof HomePage>>()
 
 // 筛选器数据
-const facetData = ref<Facet[]>([])
+const facetData = ref<FacetDistribution>({})
 const tagOptions = ref<Array<{ value: string; label: string; count: number }>>([])
 const authorOptions = ref<Array<{ value: string; label: string; count: number }>>([])
 const artistOptions = ref<Array<{ value: string; label: string; count: number }>>([])
@@ -31,7 +31,7 @@ const closeSidebar = () => {
 }
 
 // 更新筛选器数据
-const handleUpdateFilters = (_newFilters: Filters, newFacetData: Facet[]) => {
+const handleUpdateFilters = (_newFilters: Filters, newFacetData: FacetDistribution) => {
   facetData.value = newFacetData
   if (homePageRef.value) {
     tagOptions.value = homePageRef.value.tagOptions
@@ -56,9 +56,12 @@ const handleResetFilters = () => {
     homePageRef.value.filters.authors = []
     homePageRef.value.filters.artists = []
     homePageRef.value.filters.difficulties = []
+    homePageRef.value.filters.minBpm = null
+    homePageRef.value.filters.maxBpm = null
     homePageRef.value.filters.review = 'peer'
     homePageRef.value.applyFilters()
   }
+  closeSidebar()
 }
 </script>
 

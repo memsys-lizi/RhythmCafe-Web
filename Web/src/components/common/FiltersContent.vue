@@ -6,7 +6,6 @@
       :items="tagOptions"
       v-model="filters.tags"
       :searchable="true"
-      :total-count="tagTotalCount"
     >
       <template #icon>
         <Tag :size="14" />
@@ -19,7 +18,6 @@
       :items="authorOptions"
       v-model="filters.authors"
       :searchable="true"
-      :total-count="authorTotalCount"
     >
       <template #icon>
         <Users :size="14" />
@@ -32,7 +30,6 @@
       :items="artistOptions"
       v-model="filters.artists"
       :searchable="true"
-      :total-count="artistTotalCount"
     >
       <template #icon>
         <Music :size="14" />
@@ -52,6 +49,44 @@
       </template>
     </FilterGroup>
 
+    <!-- BPM 范围筛选 -->
+    <div class="filter-group bpm-group">
+      <div class="filter-header">
+        <h3 class="filter-title">
+          <Activity :size="14" />
+          BPM
+        </h3>
+      </div>
+
+      <label class="bpm-toggle">
+        <input type="checkbox" :checked="bpmEnabled" @change="toggleBpm" />
+        <span>启用范围筛选</span>
+      </label>
+
+      <div class="bpm-fields">
+        <label>
+          <span>最低</span>
+          <input
+            v-model.number="filters.minBpm"
+            type="number"
+            min="0"
+            max="1000"
+            :disabled="!bpmEnabled"
+          />
+        </label>
+        <label>
+          <span>最高</span>
+          <input
+            v-model.number="filters.maxBpm"
+            type="number"
+            min="0"
+            max="1000"
+            :disabled="!bpmEnabled"
+          />
+        </label>
+      </div>
+    </div>
+
     <!-- 同行评审筛选 -->
     <div class="filter-group">
       <div class="filter-header">
@@ -67,7 +102,23 @@
             value="peer"
             v-model="filters.review"
           />
-          <span>仅同行评审谱面</span>
+          <span>Peer Reviewed</span>
+        </label>
+        <label class="review-option">
+          <input
+            type="radio"
+            value="pending"
+            v-model="filters.review"
+          />
+          <span>Pending</span>
+        </label>
+        <label class="review-option">
+          <input
+            type="radio"
+            value="non-refereed"
+            v-model="filters.review"
+          />
+          <span>Non-Refereed</span>
         </label>
         <label class="review-option">
           <input
@@ -75,7 +126,7 @@
             value="all"
             v-model="filters.review"
           />
-          <span>所有谱面</span>
+          <span>All</span>
         </label>
       </div>
     </div>
@@ -94,13 +145,13 @@
 
 <script setup lang="ts">
 import { computed } from 'vue'
-import { Tag, Users, Music, TrendingUp, CheckCircle } from 'lucide-vue-next'
+import { Activity, CheckCircle, Music, Tag, TrendingUp, Users } from 'lucide-vue-next'
 import FilterGroup from './FilterGroup.vue'
-import type { Filters, Facet } from '@/types'
+import type { FacetDistribution, Filters } from '@/types'
 
 const props = defineProps<{
   filters: Filters
-  facetData: Facet[]
+  facetData: FacetDistribution
   tagOptions: Array<{ value: string; label: string; count: number }>
   authorOptions: Array<{ value: string; label: string; count: number }>
   artistOptions: Array<{ value: string; label: string; count: number }>
@@ -112,20 +163,20 @@ defineEmits<{
   'reset': []
 }>()
 
-const tagTotalCount = computed(() => {
-  const facet = props.facetData.find(f => f.field_name === 'tags')
-  return facet?.stats.total_values || 0
+const bpmEnabled = computed(() => {
+  return props.filters.minBpm !== null || props.filters.maxBpm !== null
 })
 
-const authorTotalCount = computed(() => {
-  const facet = props.facetData.find(f => f.field_name === 'authors')
-  return facet?.stats.total_values || 0
-})
-
-const artistTotalCount = computed(() => {
-  const facet = props.facetData.find(f => f.field_name === 'artist')
-  return facet?.stats.total_values || 0
-})
+const toggleBpm = (event: Event) => {
+  const enabled = (event.target as HTMLInputElement).checked
+  if (enabled) {
+    props.filters.minBpm ??= 20
+    props.filters.maxBpm ??= 400
+  } else {
+    props.filters.minBpm = null
+    props.filters.maxBpm = null
+  }
+}
 </script>
 
 <style scoped>
@@ -165,6 +216,43 @@ const artistTotalCount = computed(() => {
 .review-option span {
   font-size: 0.875rem;
   color: var(--text-primary);
+}
+
+.bpm-toggle {
+  display: flex;
+  align-items: center;
+  gap: var(--spacing-sm);
+  font-size: 0.875rem;
+  color: var(--text-primary);
+  margin-bottom: var(--spacing-md);
+}
+
+.bpm-toggle input {
+  width: 16px;
+  height: 16px;
+  accent-color: var(--color-white);
+}
+
+.bpm-fields {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: var(--spacing-sm);
+}
+
+.bpm-fields label {
+  display: flex;
+  flex-direction: column;
+  gap: var(--spacing-xs);
+  color: var(--text-secondary);
+  font-size: 0.75rem;
+}
+
+.bpm-fields input {
+  width: 100%;
+  min-width: 0;
+  padding: var(--spacing-sm);
+  border-radius: var(--radius-md);
+  font-size: 0.875rem;
 }
 
 .filter-actions {

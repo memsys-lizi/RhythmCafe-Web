@@ -11,7 +11,11 @@
     <aside class="sidebar" :class="{ 'is-open': isOpen }">
       <div class="sidebar-header">
         <h2>筛选选项</h2>
-        <button class="close-btn" @click="$emit('close')">
+        <button
+          class="close-btn"
+          aria-label="关闭筛选"
+          @click="$emit('close')"
+        >
           <X :size="20" />
         </button>
       </div>
@@ -39,7 +43,7 @@ defineEmits<{
 .sidebar-overlay {
   position: fixed;
   inset: 0;
-  background-color: rgba(0, 0, 0, 0.6);
+  background-color: rgba(0, 0, 0, 0.52);
   z-index: 200;
   animation: fadeIn var(--transition-fast) ease-out;
 }
@@ -50,13 +54,14 @@ defineEmits<{
   left: 0;
   bottom: 0;
   width: var(--sidebar-width);
-  background-color: var(--bg-secondary);
-  border-right: 1px solid var(--border-primary);
+  background: linear-gradient(180deg, #171717 0%, #101010 100%);
+  border-right: 1px solid rgba(255, 255, 255, 0.1);
   z-index: 201;
   transform: translateX(-100%);
   transition: transform var(--transition-base);
   display: flex;
   flex-direction: column;
+  box-shadow: 18px 0 50px rgba(0, 0, 0, 0.35);
 }
 
 .sidebar.is-open {
@@ -67,15 +72,16 @@ defineEmits<{
   display: flex;
   align-items: center;
   justify-content: space-between;
-  padding: var(--spacing-lg);
+  padding: var(--spacing-lg) 1.25rem;
   border-bottom: 1px solid var(--border-primary);
-  height: var(--header-height);
+  min-height: 72px;
 }
 
 .sidebar-header h2 {
-  font-size: 1.125rem;
+  font-size: 1.2rem;
   font-weight: 600;
   margin: 0;
+  letter-spacing: -0.02em;
 }
 
 .close-btn {
@@ -102,7 +108,7 @@ defineEmits<{
 .sidebar-content {
   flex: 1;
   overflow-y: auto;
-  padding: var(--spacing-lg);
+  padding: 1.25rem;
 }
 
 @media (max-width: 768px) {

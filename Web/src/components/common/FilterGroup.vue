@@ -79,7 +79,7 @@ const handleChange = (value: string) => {
 
 <style scoped>
 .filter-group {
-  margin-bottom: var(--spacing-xl);
+  margin-bottom: var(--spacing-lg);
 }
 
 .filter-header {
@@ -90,11 +90,9 @@ const handleChange = (value: string) => {
   display: flex;
   align-items: center;
   gap: var(--spacing-sm);
-  font-size: 0.875rem;
+  font-size: 0.95rem;
   font-weight: 600;
-  text-transform: uppercase;
-  letter-spacing: 0.05em;
-  color: var(--text-secondary);
+  color: var(--text-primary);
   margin: 0;
 }
 
@@ -110,31 +108,34 @@ const handleChange = (value: string) => {
 
 .filter-search-input {
   width: 100%;
-  padding: var(--spacing-sm) var(--spacing-md);
+  padding: 0.65rem 0.75rem;
   border-radius: var(--radius-md);
   font-size: 0.875rem;
+  background-color: rgba(255, 255, 255, 0.04);
+  border-color: var(--border-secondary);
 }
 
 .filter-list {
   display: flex;
   flex-direction: column;
   gap: var(--spacing-xs);
-  max-height: 300px;
+  max-height: 260px;
   overflow-y: auto;
+  padding-right: 0.25rem;
 }
 
 .filter-item {
   display: flex;
   align-items: center;
   gap: var(--spacing-sm);
-  padding: var(--spacing-sm);
+  padding: 0.6rem 0.65rem;
   border-radius: var(--radius-md);
   cursor: pointer;
   transition: background-color var(--transition-fast);
 }
 
 .filter-item:hover {
-  background-color: var(--bg-hover);
+  background-color: rgba(255, 255, 255, 0.07);
 }
 
 .filter-item input[type="checkbox"] {
@@ -142,6 +143,7 @@ const handleChange = (value: string) => {
   height: 16px;
   cursor: pointer;
   accent-color: var(--color-white);
+  flex: 0 0 auto;
 }
 
 .filter-label {

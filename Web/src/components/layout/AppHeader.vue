@@ -32,7 +32,11 @@
         </nav>
 
         <!-- Mobile Menu Toggle -->
-        <button class="mobile-menu-btn" @click="$emit('toggle-sidebar')">
+        <button
+          class="mobile-menu-btn"
+          aria-label="打开筛选"
+          @click="$emit('toggle-sidebar')"
+        >
           <Menu :size="24" />
         </button>
       </div>

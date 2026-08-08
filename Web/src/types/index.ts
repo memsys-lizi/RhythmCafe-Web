@@ -1,18 +1,36 @@
-// 谱面数据类型定义
+// Rhythm Café 关卡数据
 export interface Level {
   id: string
   song: string
+  song_alt: string
   artist: string
   authors: string[]
   description: string
   difficulty: 0 | 1 | 2 | 3
   approval: number
-  image: string
-  url: string
-  url2: string
+  image_url: string
+  thumb_url: string
+  icon_url: string
+  rdzip_url: string
   tags: string[]
   min_bpm: number
   max_bpm: number
+  last_updated: string
+  seizure_warning: boolean
+  single_player: boolean
+  two_player: boolean
+  is_animated: boolean
+  is_private: boolean
+  is_hidden: boolean
+  total_hits_approx: number
+  submitter?: {
+    id: string
+    displayName: string
+  }
+  club?: {
+    id: string
+    name: string
+  }
   has_classics: boolean
   has_freetimes: boolean
   has_freezeshots: boolean
@@ -21,32 +39,6 @@ export interface Level {
   has_skipshots: boolean
   has_squareshots: boolean
   has_window_dance: boolean
-  seizure_warning: boolean
-  single_player: boolean
-  two_player: boolean
-  source: string
-  indexed: number
-  last_updated: number
-}
-
-// API 响应类型
-export interface SearchHit {
-  document: Level
-  highlight: {
-    song?: string
-    artist?: string
-    authors?: string[]
-    description?: string
-    tags?: string[]
-  }
-  text_match: number
-  text_match_info: {
-    best_field_score: string
-    best_field_weight: number
-    fields_matched: number
-    score: string
-    tokens_matched: number
-  }
 }
 
 export interface FacetCount {
@@ -55,37 +47,52 @@ export interface FacetCount {
   value: string
 }
 
-export interface FacetStats {
-  total_values: number
+export type FacetDistribution = Record<string, FacetCount[]>
+
+export interface UpstreamResults {
+  hits: Level[]
+  estimatedTotalHits: number
+  processingTimeMs: number
+  limit: number
+  offset: number
+  query: string
+  facetDistribution: FacetDistribution
 }
 
-export interface Facet {
-  counts: FacetCount[]
-  field_name: string
-  stats: FacetStats
+export interface UpstreamResponse {
+  action: string
+  view: string
+  overlay: boolean
+  metadata: {
+    title: string
+  }
+  props: {
+    results: UpstreamResults
+  }
+  context?: Record<string, unknown>
+  messages?: unknown[]
 }
 
-export interface SearchResponse {
-  facet_counts: Facet[]
-  found: number
-  hits: SearchHit[]
-  out_of: number
+export interface LevelSearchResult {
+  levels: Level[]
+  totalResults: number
   page: number
-  request_params: Record<string, any>
-  search_cutoff: boolean
-  search_time_ms: number
+  pageSize: number
+  facets: FacetDistribution
 }
 
-// 筛选条件类型
+export type ReviewFilter = 'peer' | 'pending' | 'non-refereed' | 'all'
+
 export interface Filters {
   tags: string[]
   authors: string[]
   artists: string[]
   difficulties: string[]
-  review: 'peer' | 'all'
+  minBpm: number | null
+  maxBpm: number | null
+  review: ReviewFilter
 }
 
-// 难度标签映射
 export const DIFFICULTY_LABELS: Record<number, string> = {
   0: 'Easy',
   1: 'Medium',
@@ -93,10 +100,9 @@ export const DIFFICULTY_LABELS: Record<number, string> = {
   3: 'Very Tough'
 }
 
-// 难度颜色映射
 export const DIFFICULTY_COLORS: Record<number, string> = {
-  0: '#10b981', // green
-  1: '#3b82f6', // blue
-  2: '#f59e0b', // orange
-  3: '#ef4444'  // red
+  0: '#10b981',
+  1: '#3b82f6',
+  2: '#f59e0b',
+  3: '#ef4444'
 }

@@ -11,6 +11,13 @@
       </button>
     </div>
 
+    <div v-if="!loading && !error" class="container result-summary">
+      <span>
+        {{ totalResults }} 个结果<span v-if="searchQuery">，关键词“{{ searchQuery }}”</span>
+      </span>
+      <span v-if="hasActiveFilters" class="filter-status">已应用筛选</span>
+    </div>
+
     <!-- 主内容区 -->
     <div class="container">
       <!-- 加载骨架屏 -->
@@ -55,13 +62,13 @@ import SearchBar from '@/components/common/SearchBar.vue'
 import LevelCard from '@/components/common/LevelCard.vue'
 import SkeletonCard from '@/components/common/SkeletonCard.vue'
 import Pagination from '@/components/common/Pagination.vue'
-import type { Level, Facet } from '@/types'
+import type { FacetDistribution, Filters, Level } from '@/types'
 import { ApiService } from '@/services/api'
 import { useFilters } from '@/composables/useFilters'
 
 const emit = defineEmits<{
   'toggle-sidebar': []
-  'update-filters': [filters: any, facetData: Facet[]]
+  'update-filters': [filters: Filters, facetData: FacetDistribution]
 }>()
 
 // 使用筛选器 composable
@@ -72,7 +79,8 @@ const {
   authorOptions,
   artistOptions,
   difficultyOptions,
-  updateFacetData
+  updateFacetData,
+  hasActiveFilters
 } = useFilters()
 
 // 状态
@@ -97,15 +105,15 @@ const loadLevels = async () => {
     )
 
     if (response) {
-      levels.value = response.hits.map(hit => hit.document)
-      totalResults.value = response.found
-      totalPages.value = Math.ceil(response.found / 25)
+      levels.value = response.levels
+      totalResults.value = response.totalResults
+      totalPages.value = Math.ceil(response.totalResults / response.pageSize)
 
       // 更新 facet 数据
-      if (response.facet_counts) {
-        updateFacetData(response.facet_counts)
+      if (response.facets) {
+        updateFacetData(response.facets)
         // 通知父组件更新筛选器数据
-        emit('update-filters', filters.value, response.facet_counts)
+        emit('update-filters', filters.value, response.facets)
       }
     } else {
       error.value = '获取谱面数据失败，请稍后再试'
@@ -189,6 +197,23 @@ onMounted(() => {
 .filter-toggle-btn svg {
   width: 20px;
   height: 20px;
+}
+
+.result-summary {
+  display: flex;
+  align-items: center;
+  gap: var(--spacing-sm);
+  margin-bottom: var(--spacing-lg);
+  color: var(--text-secondary);
+  font-size: 0.875rem;
+}
+
+.filter-status {
+  padding: 0.25rem 0.6rem;
+  border: 1px solid var(--border-secondary);
+  border-radius: var(--radius-full);
+  color: var(--text-primary);
+  background-color: rgba(255, 255, 255, 0.05);
 }
 
 .levels-grid {

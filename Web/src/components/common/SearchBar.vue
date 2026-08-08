@@ -8,7 +8,7 @@
           type="text"
           class="search-input"
           placeholder="搜索谱面、作者或歌曲..."
-          @keypress.enter="handleSearch"
+          @keydown.enter.prevent="handleSearch"
         />
         <button class="search-btn" @click="handleSearch">
           <Search :size="20" />

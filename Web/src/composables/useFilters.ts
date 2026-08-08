@@ -1,96 +1,67 @@
-import { ref, computed } from 'vue'
-import type { Filters, Facet } from '@/types'
+import { computed, ref } from 'vue'
+import type { FacetDistribution, Filters } from '@/types'
+
+const createDefaultFilters = (): Filters => ({
+  tags: [],
+  authors: [],
+  artists: [],
+  difficulties: [],
+  minBpm: null,
+  maxBpm: null,
+  review: 'peer'
+})
+
+function optionsFor(facets: FacetDistribution, key: string) {
+  return (facets[key] ?? []).map(item => ({
+    value: item.value,
+    label: item.highlighted || item.value,
+    count: item.count
+  }))
+}
 
 export function useFilters() {
-  // 筛选条件
-  const filters = ref<Filters>({
-    tags: [],
-    authors: [],
-    artists: [],
-    difficulties: [],
-    review: 'peer'
-  })
+  const filters = ref<Filters>(createDefaultFilters())
+  const facetData = ref<FacetDistribution>({})
 
-  // Facet 数据（从 API 返回）
-  const facetData = ref<Facet[]>([])
-
-  // 标签选项
-  const tagOptions = computed(() => {
-    const facet = facetData.value.find(f => f.field_name === 'tags')
-    if (!facet) return []
-    return facet.counts.map(c => ({
-      value: c.value,
-      label: c.value,
-      count: c.count
-    }))
-  })
-
-  // 作者选项
-  const authorOptions = computed(() => {
-    const facet = facetData.value.find(f => f.field_name === 'authors')
-    if (!facet) return []
-    return facet.counts.map(c => ({
-      value: c.value,
-      label: c.value,
-      count: c.count
-    }))
-  })
-
-  // 艺术家选项
-  const artistOptions = computed(() => {
-    const facet = facetData.value.find(f => f.field_name === 'artist')
-    if (!facet) return []
-    return facet.counts.map(c => ({
-      value: c.value,
-      label: c.value,
-      count: c.count
-    }))
-  })
-
-  // 难度选项
+  const tagOptions = computed(() => optionsFor(facetData.value, 'tags'))
+  const authorOptions = computed(() => optionsFor(facetData.value, 'authors'))
+  const artistOptions = computed(() => optionsFor(facetData.value, 'artist_tokens'))
   const difficultyOptions = computed(() => {
-    const facet = facetData.value.find(f => f.field_name === 'difficulty')
-    if (!facet) {
-      // 返回默认难度选项
-      return [
+    const options = optionsFor(facetData.value, 'difficulty')
+    return options.length > 0
+      ? options.map(item => ({
+        ...item,
+        label: {
+          '0': 'Easy',
+          '1': 'Medium',
+          '2': 'Tough',
+          '3': 'Very Tough'
+        }[item.value] ?? item.label
+      }))
+      : [
         { value: '0', label: 'Easy', count: 0 },
         { value: '1', label: 'Medium', count: 0 },
         { value: '2', label: 'Tough', count: 0 },
         { value: '3', label: 'Very Tough', count: 0 }
       ]
-    }
-    return facet.counts.map(c => ({
-      value: String(c.value),
-      label: c.value === '0' ? 'Easy' :
-             c.value === '1' ? 'Medium' :
-             c.value === '2' ? 'Tough' : 'Very Tough',
-      count: c.count
-    }))
   })
 
-  // 更新 facet 数据
-  const updateFacetData = (facets: Facet[]) => {
+  const updateFacetData = (facets: FacetDistribution) => {
     facetData.value = facets
   }
 
-  // 重置筛选条件
   const resetFilters = () => {
-    filters.value = {
-      tags: [],
-      authors: [],
-      artists: [],
-      difficulties: [],
-      review: 'peer'
-    }
+    filters.value = createDefaultFilters()
   }
 
-  // 检查是否有激活的筛选
   const hasActiveFilters = computed(() => {
     return filters.value.tags.length > 0 ||
-           filters.value.authors.length > 0 ||
-           filters.value.artists.length > 0 ||
-           filters.value.difficulties.length > 0 ||
-           filters.value.review !== 'peer'
+      filters.value.authors.length > 0 ||
+      filters.value.artists.length > 0 ||
+      filters.value.difficulties.length > 0 ||
+      filters.value.minBpm !== null ||
+      filters.value.maxBpm !== null ||
+      filters.value.review !== 'peer'
   })
 
   return {

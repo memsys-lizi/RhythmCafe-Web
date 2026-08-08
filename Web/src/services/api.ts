@@ -1,90 +1,97 @@
-import type { SearchResponse, Filters } from '@/types'
+import type {
+  Filters,
+  FacetDistribution,
+  LevelSearchResult,
+  UpstreamResponse
+} from '@/types'
 
-// 使用你的代理站点 API
-const API_BASE_URL = 'https://cafe.rhythmdoctor.top/api'
+const API_BASE_URL = import.meta.env.VITE_API_BASE_URL ?? '/api'
+
+function appendValues(params: URLSearchParams, key: string, values: string[]) {
+  for (const value of values) {
+    if (value.trim()) {
+      params.append(key, value)
+    }
+  }
+}
+
+function normalizeFacets(facets: FacetDistribution | undefined): FacetDistribution {
+  if (!facets || typeof facets !== 'object') {
+    return {}
+  }
+
+  return Object.fromEntries(
+    Object.entries(facets).map(([key, value]) => [
+      key,
+      Array.isArray(value) ? value : []
+    ])
+  )
+}
 
 export class ApiService {
-  /**
-   * 获取谱面列表
-   */
   static async fetchLevels(
     page: number = 1,
     query: string = '',
-    filters: Filters,
-    sortBy: string = '',
-    facetQuery: string = ''
-  ): Promise<SearchResponse | null> {
-    try {
-      const params = new URLSearchParams()
+    filters: Filters
+  ): Promise<LevelSearchResult> {
+    const params = new URLSearchParams()
+    const normalizedQuery = query.trim()
 
-      // 基础参数
-      params.append('q', query)
-      params.append('page', String(page))
-      params.append('per_page', '25')
-      params.append('query_by', 'song,authors,artist,tags,description')
-      params.append('query_by_weights', '12,8,6,5,4')
-      params.append('facet_by', 'authors,tags,source,difficulty,artist')
-      params.append('max_facet_values', '10')
-      params.append('num_typos', '2,1,1,1,0')
+    if (normalizedQuery) {
+      params.set('q', normalizedQuery)
+    }
 
-      // Facet 查询
-      if (facetQuery) {
-        params.append('facet_query', facetQuery)
+    params.set('page', String(page))
+    appendValues(params, 'tags_all', filters.tags)
+    appendValues(params, 'authors_all', filters.authors)
+    appendValues(params, 'artists_all', filters.artists)
+    appendValues(params, 'difficulty', filters.difficulties)
+
+    if (filters.minBpm !== null) {
+      params.set('min_bpm', String(filters.minBpm))
+    }
+
+    if (filters.maxBpm !== null) {
+      params.set('max_bpm', String(filters.maxBpm))
+    }
+
+    if (filters.review !== 'peer') {
+      params.set(
+        'peer_review',
+        filters.review === 'non-refereed' ? 'rejected' : filters.review
+      )
+    }
+
+    const response = await fetch(`${API_BASE_URL}/levels?${params.toString()}`, {
+      headers: {
+        Accept: 'application/json'
       }
+    })
 
-      // 排序
-      if (sortBy) {
-        params.append('sort_by', sortBy)
-      } else {
-        const defaultSort = filters.review === 'all'
-          ? '_text_match:desc,last_updated:desc'
-          : '_text_match:desc,indexed:desc,last_updated:desc'
-        params.append('sort_by', defaultSort)
-      }
+    if (!response.ok) {
+      throw new Error(`API request failed: ${response.status}`)
+    }
 
-      // 构建筛选条件
-      let filterBy = filters.review === 'peer'
-        ? 'approval:=[10..20]'
-        : 'approval:=[-1..20]'
+    const data = await response.json() as UpstreamResponse
+    const results = data.props?.results
 
-      if (filters.difficulties.length > 0) {
-        filterBy += ` && difficulty:=[${filters.difficulties.join(',')}]`
-      }
+    if (!results || !Array.isArray(results.hits)) {
+      throw new Error('API response has an unexpected shape')
+    }
 
-      if (filters.tags.length > 0) {
-        const tagFilters = filters.tags.map(tag => `\`${tag}\``).join(',')
-        filterBy += ` && tags:=[${tagFilters}]`
-      }
+    const pageSize = Number(results.limit) > 0 ? Number(results.limit) : 20
+    const offset = Number(results.offset) >= 0 ? Number(results.offset) : 0
 
-      if (filters.authors.length > 0) {
-        const authorFilters = filters.authors.map(author => `\`${author}\``).join(',')
-        filterBy += ` && authors:=[${authorFilters}]`
-      }
-
-      if (filters.artists.length > 0) {
-        const artistFilters = filters.artists.map(artist => `\`${artist}\``).join(',')
-        filterBy += ` && artist:=[${artistFilters}]`
-      }
-
-      params.append('filter_by', filterBy)
-
-      const response = await fetch(`${API_BASE_URL}/get_chartlist.php?${params.toString()}`)
-
-      if (!response.ok) {
-        throw new Error(`API request failed: ${response.status}`)
-      }
-
-      return await response.json()
-    } catch (error) {
-      console.error('Failed to fetch levels:', error)
-      return null
+    return {
+      levels: results.hits,
+      totalResults: Number(results.estimatedTotalHits) || 0,
+      page: Math.floor(offset / pageSize) + 1,
+      pageSize,
+      facets: normalizeFacets(results.facetDistribution)
     }
   }
 
-  /**
-   * 获取下载链接
-   */
-  static getDownloadUrl(url: string): string {
-    return `${API_BASE_URL}/download.php?url=${encodeURIComponent(url)}`
+  static getDownloadUrl(id: string): string {
+    return `${API_BASE_URL}/levels/${encodeURIComponent(id)}/download`
   }
 }
