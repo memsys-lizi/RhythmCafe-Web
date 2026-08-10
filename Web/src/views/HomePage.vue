@@ -46,10 +46,11 @@
 
       <!-- 分页 -->
       <Pagination
-        v-if="totalPages > 1"
         :current-page="currentPage"
         :total-pages="totalPages"
+        :page-size="pageSize"
         @change="handlePageChange"
+        @change-page-size="handlePageSizeChange"
       />
     </div>
   </div>
@@ -91,6 +92,7 @@ const currentPage = ref(1)
 const totalPages = ref(1)
 const totalResults = ref(0)
 const searchQuery = ref('')
+const pageSize = ref(20)
 
 // 加载谱面数据
 const loadLevels = async () => {
@@ -101,7 +103,8 @@ const loadLevels = async () => {
     const response = await ApiService.fetchLevels(
       currentPage.value,
       searchQuery.value,
-      filters.value
+      filters.value,
+      pageSize.value
     )
 
     if (response) {
@@ -136,6 +139,16 @@ const handleSearch = (query: string) => {
 // 分页处理
 const handlePageChange = (page: number) => {
   currentPage.value = page
+  loadLevels()
+}
+
+// 每页条数变更：回到第一页重新加载
+const handlePageSizeChange = (size: number) => {
+  if (size === pageSize.value) {
+    return
+  }
+  pageSize.value = size
+  currentPage.value = 1
   loadLevels()
 }
 

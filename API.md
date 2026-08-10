@@ -512,7 +512,7 @@ const chunk = await response.arrayBuffer()
 官方 Rhythm Cafe 还提供公开的 Datasette 数据库服务，可以一次性拉取大量关卡数据。本项目的 `/api/db` 是它的镜像代理：**路径和参数与官方完全一致**，使用方只需要把请求地址的前缀从 `https://datasette.rhythm.cafe` 换成项目的 `/api/db`，其余代码不用改。
 
 - 搜索接口 `/api/levels` 每页固定 22 条，适合人浏览页面。
-- 数据库接口一次最多返回 1000 行，适合程序拉取全量数据（当前全库约 7364 条，每页 1000 行时大约 8 次请求拉完）。
+- 数据库接口一次最多返回 1000 行，适合程序拉取全量数据（全库约 7000 多条且持续新增，每页 1000 行时大约 8 次请求拉完）。
 
 以下示例中的 `rdlevels` 是官方数据库中的关卡表。本项目只代理这一张表，**不代理其他表（如 FTS 内部表），也不接受自定义 SQL**。
 
@@ -570,7 +570,7 @@ http://127.0.0.1:5173/api/db/rdlevels/rdlevels.json
 | --- | --- | --- |
 | `rows` | array | 当前页的行数组，每行是数组或对象（取决于 `_shape`）。 |
 | `columns` | array | 列名数组，与 `rows` 中位置数组的每一列一一对应。 |
-| `filtered_table_rows_count` | number | 全表总行数（当前约 7364）。 |
+| `filtered_table_rows_count` | number | 全表总行数（约 7000 多条且持续新增，以下示例中的 7364 仅为示例值）。 |
 | `next` | string | 下一页游标值，仅在还有下一页时存在。 |
 | `next_url` | string | 下一页完整请求地址。**本项目已把它重写为镜像自己的地址，直接使用即可**；只有一页时该字段不存在。 |
 | `truncated` | boolean | 本次返回是否被截断。 |
@@ -608,7 +608,7 @@ for (const row of data.rows) {
 
 ### 6.5 拉取全量数据
 
-循环跟随 `next_url`，直到响应中不再出现 `next_url`。当前全库约 7364 行，每页 1000 行时大约 8 次请求。
+循环跟随 `next_url`，直到响应中不再出现 `next_url`。全库约 7000 多条且持续新增，每页 1000 行时大约 8 次请求。
 
 Node.js 示例（保存为 `dump.mjs` 后运行）：
 
@@ -669,7 +669,133 @@ curl "https://cafe.rhythmdoctor.top/api/db/rdlevels/rdlevels.json?_size=1000" -o
 | 自定义 SQL | 官方可能允许 | 不接受，白名单参数之外一律忽略 |
 | 其他表（FTS 等） | 可访问 | 不代理 |
 
-## 7. 错误响应
+## 7. 数据库搜索接口（前端分页搜索）
+
+```http
+GET /api/levels/db
+```
+
+**前端页面使用的数据库搜索接口**：数据源是官方 Datasette，与 `/api/levels` 的**传入参数和返回结构完全一致**（前端 `api.ts` 的解析逻辑零改动），区别只是**每页返回条数可调（最多 500 条）**。
+
+- `/api/levels` 每页固定 22 条，透传官方搜索服务。
+- `/api/levels/db` 每页默认 20 条，可在 `per_page` 指定并最多调到 500 条。
+- 后端**直接中转官方数据库**，不缓存任何关卡数据：顺序翻页时一次前端请求 = 一次官方请求。
+- 当前 Web 首页的分页器已接入本接口，并提供每页条数下拉框（20 / 50 / 100 / 200 / 500）。
+
+线上示例：
+
+```text
+https://cafe.rhythmdoctor.top/api/levels/db?per_page=500&page=1
+```
+
+### 7.1 请求参数
+
+与 2.1 节完全一致（`q`、`page`、`tags_all`、`authors_all`、`artists_all`、`difficulty`、`min_bpm`、`max_bpm`、`peer_review`），新增：
+
+| 参数 | 类型 | 是否必填 | 说明 |
+| --- | --- | --- | --- |
+| `per_page` | integer | 否 | 每页返回条数，默认 `20`，最大 `500`。超过 500 会被钳制到 500，小于 1 回退到 20。 |
+
+多选参数与 2.4 节一致：同名参数重复传入（`tags_all=a&tags_all=b`），也用逗号分隔单参数的写法。
+
+### 7.2 返回结构
+
+与 `/api/levels` 完全一致（见第 3 章）：
+
+```json
+{
+  "action": "render",
+  "view": "cafe:level_search",
+  "overlay": false,
+  "metadata": { "title": "" },
+  "props": {
+    "results": {
+      "hits": [],
+      "estimatedTotalHits": 5095,
+      "processingTimeMs": 312,
+      "limit": 500,
+      "offset": 0,
+      "query": "",
+      "facetDistribution": {}
+    }
+  },
+  "context": {},
+  "messages": []
+}
+```
+
+字段语义与 3.2 / 3.3 节相同，差异如下：
+
+| 字段 | 与 `/api/levels` 的差异 |
+| --- | --- |
+| `estimatedTotalHits` | 官方数据库的**精确计数**（`filtered_table_rows_count`），不是估算值。 |
+| `processingTimeMs` | 后端处理耗时（含直跳页时的内部补拉）。 |
+| `facetDistribution` | 只有 6 组：`artist_tokens`、`tags`、`authors`、`difficulty`、`single_player`、`two_player`。没有 `submitter.id` 和 `club.id`。 |
+
+### 7.3 与 `/api/levels` 的行为差异
+
+| 项目 | `/api/levels` | `/api/levels/db` |
+| --- | --- | --- |
+| 每页条数 | 固定 22 | `per_page` 可调，最多 500 |
+| 排序 | 无关键词按最后更新倒序；有关键词按相关度 | 固定最后更新倒序 |
+| 关键词 `q` | 官方搜索服务的分词全文搜索 | 跨列**子串匹配**（song / song_alt / artist / description 与 tags / authors / artist_tokens 的 JSON 元素），不分词；中文连续词可直接搜索 |
+| 大小写 | — | 大小写不敏感（SQLite LIKE 语义） |
+| 关卡对象 | 官方搜索服务输出 | 官方数据库行转换而来，字段以数据库列为准（见下方说明） |
+
+关卡对象字段说明：
+
+- 官方数据库没有的搜索服务字段（`song_raw`、`artist_raw`、`authors_raw`、`hue`、`sha1`、`rdlevel_sha1`、`rd_md5`、`prefill_version`、`approval_notes_public`、`total_hits_approx` 等）**不会出现**在 `hits` 的关卡对象里。
+- `tags`、`authors` 已从 JSON 字符串解析为数组；`submitter` 结构为 `{ id, displayName }`，`club` 结构为 `{ id, name }`；布尔字段（`single_player`、`two_player`、`is_hidden` 等）已转换为 `boolean`。
+- 排序固定 `last_updated` 降序，与 `/api/levels` 无关键词时的排序一致。
+
+筛选器计数说明（`facetDistribution`）：
+
+- 官方数据库按 JSON 整串分桶且每列最多 30 桶，后端把整串桶拆开、按单个标签累加还原计数。**出现在 30 种以上整串组合里的标签，计数可能略低于真实值**（使用频率高的标签不受影响）。
+
+翻页与请求次数说明：
+
+- 顺序翻页（1 → 2 → 3）时，每页恰好一次官方请求。
+- **直跳页码**（例如从第 1 页直接点到第 100 页）时，后端会依次补拉中间页（官方不支持跳过），此时前端只发出一次请求，但后端会对官方发起多次请求。数据量大时请避免极端跳页。
+- 翻回已经看过的页会重新请求官方获取该页数据（不缓存关卡数据），返回内容以官方当时数据为准。
+- 后端只保存轻量的「查询条件 → 每页游标」映射（几字节/项，5 分钟过期），**不保存任何关卡数据**。
+
+### 7.4 完整示例
+
+```http
+GET /api/levels/db?per_page=100&page=2&q=%E7%8B%97&difficulty=1&difficulty=2&tags_all=1p&peer_review=peer
+```
+
+等价的 JavaScript 请求：
+
+```ts
+const params = new URLSearchParams({
+  q: '狗',
+  page: '2',
+  per_page: '100',
+  peer_review: 'peer'
+})
+params.append('difficulty', '1')
+params.append('difficulty', '2')
+params.append('tags_all', '1p')
+
+const response = await fetch(
+  `https://cafe.rhythmdoctor.top/api/levels/db?${params}`
+)
+const data = await response.json()
+```
+
+### 7.5 错误响应
+
+本接口的 `q`、筛选参数等不会触发官方 400（参数由后端固定拼接）；官方临时不可用时返回 502：
+
+```json
+{
+  "error": "UPSTREAM_UNAVAILABLE",
+  "message": "数据库服务暂时不可用，请稍后再试"
+}
+```
+
+## 8. 错误响应
 
 ### 7.1 关卡 ID 格式错误
 
@@ -719,7 +845,7 @@ Content-Type: application/json; charset=utf-8
 | `404` | 请求路径不存在，或上游找不到该关卡。 |
 | `502` | 后端无法正常访问上游 Rhythm Cafe。 |
 
-## 8. curl 调用示例
+## 9. curl 调用示例
 
 ### 搜索
 
@@ -745,7 +871,7 @@ curl -I "https://cafe.rhythmdoctor.top/api/levels/rcXsW2Mc/download"
 curl -v -H "Range: bytes=0-99" -o part.rdzip "https://cafe.rhythmdoctor.top/api/levels/rcXsW2Mc/download"
 ```
 
-## 9. 与前端项目的关系
+## 10. 与前端项目的关系
 
 前端的 `Web/src/services/api.ts` 会读取后端原始响应中的：
 
@@ -769,4 +895,10 @@ data.props.results.facetDistribution
 }
 ```
 
-这个整理后的结构只存在于前端服务层，并不是后端 `/api/levels` 的实际返回格式。
+这个整理后的结构只存在于前端服务层，并不是后端 `/api/levels` 或 `/api/levels/db` 的实际返回格式。
+
+当前前端状态：
+
+- `ApiService.fetchLevels(page, query, filters, perPage)` 请求 **`/api/levels/db`**（第 7 章），`perPage` 默认 20，通过 `per_page` 参数传递。
+- 分页器（`Web/src/components/common/Pagination.vue`）提供每页条数下拉框（20 / 50 / 100 / 200 / 500），切换后回到第 1 页重新加载。
+- `/api/levels`（第 2 章，每页固定 22 条）仍保留，可直接调用。

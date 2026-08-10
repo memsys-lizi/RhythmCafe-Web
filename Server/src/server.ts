@@ -3,6 +3,7 @@ import cors from '@fastify/cors'
 import { registerDatasetteRoutes } from './routes/datasette.js'
 import { registerDownloadRoutes } from './routes/downloads.js'
 import { registerLevelRoutes } from './routes/levels.js'
+import { registerLevelsDbRoutes } from './routes/levelsDb.js'
 
 const app = Fastify({
   logger: true
@@ -18,6 +19,7 @@ await app.register(cors, {
 })
 
 await registerLevelRoutes(app)
+await registerLevelsDbRoutes(app)
 await registerDownloadRoutes(app)
 await registerDatasetteRoutes(app)
 
