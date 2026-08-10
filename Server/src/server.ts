@@ -1,5 +1,6 @@
 import Fastify from 'fastify'
 import cors from '@fastify/cors'
+import { registerDatasetteRoutes } from './routes/datasette.js'
 import { registerDownloadRoutes } from './routes/downloads.js'
 import { registerLevelRoutes } from './routes/levels.js'
 
@@ -18,6 +19,7 @@ await app.register(cors, {
 
 await registerLevelRoutes(app)
 await registerDownloadRoutes(app)
+await registerDatasetteRoutes(app)
 
 const port = Number(process.env.PORT ?? 7332)
 const host = process.env.HOST ?? '0.0.0.0'

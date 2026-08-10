@@ -507,9 +507,171 @@ console.log(response.headers.get('content-range'))
 const chunk = await response.arrayBuffer()
 ```
 
-## 6. 错误响应
+## 6. 数据库接口（全量关卡数据）
 
-### 6.1 关卡 ID 格式错误
+官方 Rhythm Cafe 还提供公开的 Datasette 数据库服务，可以一次性拉取大量关卡数据。本项目的 `/api/db` 是它的镜像代理：**路径和参数与官方完全一致**，使用方只需要把请求地址的前缀从 `https://datasette.rhythm.cafe` 换成项目的 `/api/db`，其余代码不用改。
+
+- 搜索接口 `/api/levels` 每页固定 22 条，适合人浏览页面。
+- 数据库接口一次最多返回 1000 行，适合程序拉取全量数据（当前全库约 7364 条，每页 1000 行时大约 8 次请求拉完）。
+
+以下示例中的 `rdlevels` 是官方数据库中的关卡表。本项目只代理这一张表，**不代理其他表（如 FTS 内部表），也不接受自定义 SQL**。
+
+### 6.1 请求
+
+```http
+GET /api/db/rdlevels/rdlevels.json
+```
+
+线上地址：
+
+```text
+https://cafe.rhythmdoctor.top/api/db/rdlevels/rdlevels.json
+```
+
+开发环境本地地址（通过 Vite 代理）：
+
+```text
+http://127.0.0.1:5173/api/db/rdlevels/rdlevels.json
+```
+
+### 6.2 请求参数
+
+所有参数都是可选的。不传参数时返回第一页数据。
+
+| 参数 | 类型 | 说明 |
+| --- | --- | --- |
+| `_size` | integer | 每页最大返回行数。官方上限 `1000`，超过时官方返回 400，本项目原样透传。 |
+| `_next` | string | 下一页游标。取上一页响应中的 `next_url` 直接使用，不要自己编造。 |
+| `_shape` | string | 返回格式。传 `objects` 返回带列名的对象数组；不传则返回位置数组（配合响应中的 `columns` 字段使用），详见 6.4。 |
+
+其他参数一律忽略。**不接受 `_offset`**，原因见 6.6。
+
+### 6.3 响应结构
+
+成功时返回 JSON：
+
+```json
+{
+  "database": "rdlevels",
+  "table": "rdlevels",
+  "rows": [
+    [1, "rKwWN8pN", "PM Seymour", "[\"PM Seymour\"]", "PM Seymour", "It's A Binge Compilation (UTAU Cover)", "..."],
+    "..."
+  ],
+  "truncated": false,
+  "filtered_table_rows_count": 7364,
+  "columns": ["rowid", "id", "artist", "artist_tokens", "artist_raw", "song", "..."],
+  "next": 500,
+  "next_url": "/api/db/rdlevels/rdlevels.json?_size=500&_next=500"
+}
+```
+
+| 字段 | 类型 | 说明 |
+| --- | --- | --- |
+| `rows` | array | 当前页的行数组，每行是数组或对象（取决于 `_shape`）。 |
+| `columns` | array | 列名数组，与 `rows` 中位置数组的每一列一一对应。 |
+| `filtered_table_rows_count` | number | 全表总行数（当前约 7364）。 |
+| `next` | string | 下一页游标值，仅在还有下一页时存在。 |
+| `next_url` | string | 下一页完整请求地址。**本项目已把它重写为镜像自己的地址，直接使用即可**；只有一页时该字段不存在。 |
+| `truncated` | boolean | 本次返回是否被截断。 |
+
+列名与搜索接口返回的关卡字段基本一致，但注意以下区别：
+
+- `artist_tokens`、`authors`、`tags` 是 **JSON 字符串**（例如 `"[\"PM Seymour\"]"`），需要自行 `JSON.parse` 才能得到数组，而搜索接口 `/api/levels` 返回的本来就是数组。
+- `submitter`、`club` 同样可能是 JSON 字符串或空字符串。
+- 第一列 `rowid` 是数据库行号，搜索接口没有这个字段。
+
+### 6.4 行格式
+
+不传 `_shape` 时（与官方默认行为一致），`rows` 中每行是位置数组，需要配合 `columns` 字段按位置取值：
+
+```ts
+const data = await (await fetch('/api/db/rdlevels/rdlevels.json?_size=500')).json()
+const isHiddenIndex = data.columns.indexOf('is_hidden')
+
+for (const row of data.rows) {
+  const isHidden = row[isHiddenIndex]
+}
+```
+
+传 `_shape=objects` 时，每行是带列名的对象：
+
+```ts
+const data = await (
+  await fetch('/api/db/rdlevels/rdlevels.json?_size=500&_shape=objects')
+).json()
+
+for (const row of data.rows) {
+  console.log(row.song, JSON.parse(row.tags))
+}
+```
+
+### 6.5 拉取全量数据
+
+循环跟随 `next_url`，直到响应中不再出现 `next_url`。当前全库约 7364 行，每页 1000 行时大约 8 次请求。
+
+Node.js 示例（保存为 `dump.mjs` 后运行）：
+
+```js
+const BASE = 'https://cafe.rhythmdoctor.top/api/db/rdlevels/rdlevels.json'
+const all = []
+let url = `${BASE}?_size=1000`
+let pages = 0
+
+while (url) {
+  const data = await (await fetch(url)).json()
+  all.push(...data.rows)
+  pages += 1
+  url = data.next_url ?? null
+}
+
+console.log(`拉取 ${all.length} 行，共请求 ${pages} 次`)
+```
+
+或者用 curl 手动翻页：
+
+```bash
+curl "https://cafe.rhythmdoctor.top/api/db/rdlevels/rdlevels.json?_size=1000" -o page1.json
+# 取出 page1.json 中的 next_url 继续请求，直到响应中不再有 next_url
+```
+
+### 6.6 错误响应
+
+**`_offset` 参数**：官方 Datasette 会静默忽略 `_offset`（传了也返回第一页数据）。为了避免客户端静默拿到错误数据，本项目对非 0 的 `_offset` 直接返回 400：
+
+```json
+{
+  "error": "OFFSET_NOT_SUPPORTED",
+  "message": "官方 Datasette 不支持 offset 分页，请使用 _next 游标"
+}
+```
+
+请使用 `_next` 游标翻页，不要使用 `_offset`。
+
+**`_size` 超过 1000**：官方返回 400 `{"ok": false, "error": "_size must be <= 1000", ...}`，本项目原样透传。
+
+**上游不可用**：与搜索接口一致，返回 502：
+
+```json
+{
+  "error": "UPSTREAM_UNAVAILABLE",
+  "message": "数据库服务暂时不可用，请稍后再试"
+}
+```
+
+### 6.7 与官方 Datasette 的区别
+
+| 项目 | 官方 Datasette | 本项目 `/api/db` |
+| --- | --- | --- |
+| 请求地址 | `https://datasette.rhythm.cafe/rdlevels/rdlevels.json` | `https://cafe.rhythmdoctor.top/api/db/rdlevels/rdlevels.json` |
+| `next_url` | 指向官方（http） | 重写为镜像自己的地址，可直接使用 |
+| `_offset` | 静默忽略 | 返回 400 并提示使用 `_next` 游标 |
+| 自定义 SQL | 官方可能允许 | 不接受，白名单参数之外一律忽略 |
+| 其他表（FTS 等） | 可访问 | 不代理 |
+
+## 7. 错误响应
+
+### 7.1 关卡 ID 格式错误
 
 ```http
 GET /api/levels/invalid-id!/download
@@ -529,7 +691,7 @@ Content-Type: application/json; charset=utf-8
 }
 ```
 
-### 6.2 上游服务不可用
+### 7.2 上游服务不可用
 
 当后端无法连接 Rhythm Cafe、请求超时或上游请求失败时，接口返回：
 
@@ -547,7 +709,7 @@ Content-Type: application/json; charset=utf-8
 
 下载接口如果上游返回具体的 `404`、`403` 或其他 HTTP 状态，后端会保留并转发上游状态。
 
-### 6.3 常见 HTTP 状态码
+### 7.3 常见 HTTP 状态码
 
 | 状态码 | 含义 |
 | --- | --- |
@@ -557,7 +719,7 @@ Content-Type: application/json; charset=utf-8
 | `404` | 请求路径不存在，或上游找不到该关卡。 |
 | `502` | 后端无法正常访问上游 Rhythm Cafe。 |
 
-## 7. curl 调用示例
+## 8. curl 调用示例
 
 ### 搜索
 
@@ -583,7 +745,7 @@ curl -I "https://cafe.rhythmdoctor.top/api/levels/rcXsW2Mc/download"
 curl -v -H "Range: bytes=0-99" -o part.rdzip "https://cafe.rhythmdoctor.top/api/levels/rcXsW2Mc/download"
 ```
 
-## 8. 与前端项目的关系
+## 9. 与前端项目的关系
 
 前端的 `Web/src/services/api.ts` 会读取后端原始响应中的：
 

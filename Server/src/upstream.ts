@@ -1,4 +1,5 @@
 const upstreamBaseUrl = process.env.RHYTHM_CAFE_BASE_URL ?? 'https://rhythm.cafe'
+const datasetteBaseUrl = process.env.DATASETTE_BASE_URL ?? 'https://datasette.rhythm.cafe'
 const upstreamUserAgent = process.env.UPSTREAM_USER_AGENT ?? 'RhythmCafeProxy/0.1'
 
 const forwardedQueryKeys = [
@@ -77,5 +78,42 @@ export async function fetchUpstreamDownload(
   return fetch(buildDownloadUrl(id), {
     headers,
     signal: AbortSignal.timeout(60_000)
+  })
+}
+
+// DatasetteQuery 结构本身就是白名单：只允许 _size/_next/_shape 三个参数，
+// 其余参数（包括任意 SQL）一律不透传
+export interface DatasetteQuery {
+  size?: string
+  next?: string
+  shape?: string
+}
+
+export function buildDatasetteUrl(query: DatasetteQuery): URL {
+  const url = new URL('/rdlevels/rdlevels.json', datasetteBaseUrl)
+
+  if (query.size) {
+    url.searchParams.set('_size', query.size)
+  }
+  if (query.next) {
+    url.searchParams.set('_next', query.next)
+  }
+  if (query.shape) {
+    url.searchParams.set('_shape', query.shape)
+  }
+
+  return url
+}
+
+export async function fetchUpstreamDatasette(
+  query: DatasetteQuery
+): Promise<Response> {
+  return fetch(buildDatasetteUrl(query), {
+    headers: {
+      accept: 'application/json',
+      referer: `${datasetteBaseUrl}/`,
+      'user-agent': upstreamUserAgent
+    },
+    signal: AbortSignal.timeout(30_000)
   })
 }
