@@ -96,4 +96,14 @@ export class ApiService {
   static getDownloadUrl(id: string): string {
     return `${API_BASE_URL}/levels/${encodeURIComponent(id)}/download`
   }
+
+  static getAbsoluteDownloadUrl(id: string): string {
+    const url = this.getDownloadUrl(id)
+
+    if (typeof window === 'undefined') {
+      return url
+    }
+
+    return new URL(url, window.location.origin).toString()
+  }
 }

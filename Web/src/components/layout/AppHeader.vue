@@ -31,22 +31,42 @@
           </button>
         </nav>
 
-        <!-- Mobile Menu Toggle -->
-        <button
-          class="mobile-menu-btn"
-          aria-label="打开筛选"
-          @click="$emit('toggle-sidebar')"
-        >
-          <Menu :size="24" />
-        </button>
+        <div class="header-actions">
+          <button
+            class="mod-connection-btn"
+            type="button"
+            :aria-label="`Mod 连接状态：${statusLabel}`"
+            @click="openConnectionModal"
+          >
+            <span class="mod-icon-wrap">
+              <Gamepad2 :size="22" aria-hidden="true" />
+              <span class="mod-status-dot" :class="statusDotClass" aria-hidden="true" />
+            </span>
+            <span class="mod-status-text">{{ statusLabel }}</span>
+          </button>
+
+          <!-- Mobile Menu Toggle -->
+          <button
+            class="mobile-menu-btn"
+            type="button"
+            aria-label="打开筛选"
+            @click="$emit('toggle-sidebar')"
+          >
+            <Menu :size="24" />
+          </button>
+        </div>
       </div>
     </div>
   </header>
+  <ModConnectionModal />
 </template>
 
 <script setup lang="ts">
-import { Menu } from 'lucide-vue-next'
+import { computed, onMounted, onUnmounted } from 'vue'
+import { Gamepad2, Menu } from 'lucide-vue-next'
 import type { PageName } from '@/composables/useRouter'
+import { useModBridge } from '@/composables/useModBridge'
+import ModConnectionModal from '@/components/common/ModConnectionModal.vue'
 
 defineProps<{
   currentPage: PageName
@@ -56,6 +76,13 @@ defineEmits<{
   'toggle-sidebar': []
   'navigate': [page: PageName]
 }>()
+
+const { status, statusLabel, openConnectionModal, startPolling, stopPolling } = useModBridge()
+
+const statusDotClass = computed(() => `dot-${status.value}`)
+
+onMounted(startPolling)
+onUnmounted(stopPolling)
 </script>
 
 <style scoped>
@@ -75,6 +102,60 @@ defineEmits<{
   justify-content: space-between;
   height: var(--header-height);
   gap: var(--spacing-lg);
+}
+
+.header-actions {
+  display: flex;
+  align-items: center;
+  gap: var(--spacing-sm);
+}
+
+.mod-connection-btn {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--spacing-sm);
+  min-height: 40px;
+  padding: 0 var(--spacing-sm);
+  color: var(--text-secondary);
+  border-radius: var(--radius-md);
+}
+
+.mod-connection-btn:hover {
+  color: var(--text-primary);
+  background: var(--bg-hover);
+}
+
+.mod-icon-wrap {
+  position: relative;
+  display: inline-flex;
+}
+
+.mod-status-dot {
+  position: absolute;
+  top: -2px;
+  right: -3px;
+  width: 8px;
+  height: 8px;
+  border: 2px solid var(--bg-secondary);
+  border-radius: var(--radius-full);
+}
+
+.dot-connected {
+  background: var(--color-success);
+}
+
+.dot-checking {
+  background: var(--color-warning);
+}
+
+.dot-disconnected,
+.dot-unknown {
+  background: var(--color-error);
+}
+
+.mod-status-text {
+  font-size: 0.875rem;
+  font-weight: 600;
 }
 
 .logo {
@@ -191,6 +272,10 @@ defineEmits<{
 
   .logo-text h1 {
     font-size: 1.1rem;
+  }
+
+  .mod-status-text {
+    display: none;
   }
 }
 </style>

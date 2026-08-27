@@ -21,7 +21,7 @@
 
       <div class="card-meta">
         <span class="meta-item">
-          <User :size="14" />
+          <UserRound :size="14" />
           {{ authorName }}
         </span>
         <span class="meta-item">
@@ -40,7 +40,7 @@
         </span>
       </div>
 
-      <!-- 下载按钮 -->
+      <!-- 操作按钮 -->
       <div class="card-actions">
         <a
           :href="getDownloadUrl(level.id)"
@@ -51,21 +51,48 @@
           <Download :size="16" />
           下载谱面
         </a>
+        <button
+          class="download-btn secondary"
+          type="button"
+          :disabled="isOpening"
+          :aria-busy="isOpening"
+          @click="handleOpenInGame"
+        >
+          <LoaderCircle v-if="isOpening" :size="16" class="spinning" />
+          <Gamepad2 v-else :size="16" />
+          {{ openButtonLabel }}
+        </button>
       </div>
+      <p v-if="actionMessage" class="card-action-message" :class="messageClass" aria-live="polite">
+        {{ actionMessage }}
+      </p>
     </div>
   </div>
 </template>
 
 <script setup lang="ts">
-import { computed } from 'vue'
-import { Download, Check, User, Clock } from 'lucide-vue-next'
+import { computed, ref } from 'vue'
+import { Check, Clock, Download, Gamepad2, LoaderCircle, UserRound } from 'lucide-vue-next'
 import type { Level } from '@/types'
 import { DIFFICULTY_LABELS, DIFFICULTY_COLORS } from '@/types'
 import { ApiService } from '@/services/api'
+import { ModBridgeError, useModBridge } from '@/composables/useModBridge'
 
 const props = defineProps<{
   level: Level
 }>()
+
+const {
+  activeLevelId,
+  downloadProgress,
+  checkConnection,
+  openLevel,
+  openConnectionModal,
+} = useModBridge()
+
+const actionMessage = ref('')
+const messageClass = ref('')
+let messageTimer: number | null = null
 
 const difficultyLabel = computed(() => DIFFICULTY_LABELS[props.level.difficulty])
 const difficultyColor = computed(() => DIFFICULTY_COLORS[props.level.difficulty])
@@ -90,6 +117,68 @@ const displayTags = computed(() => {
 
 const getDownloadUrl = (id: string) => {
   return ApiService.getDownloadUrl(id)
+}
+
+const isOpening = computed(() => {
+  return (
+    activeLevelId.value === props.level.id &&
+    downloadProgress.value !== null &&
+    !['success', 'error'].includes(downloadProgress.value.state)
+  )
+})
+
+const openButtonLabel = computed(() => {
+  if (!isOpening.value) return '在游戏中打开'
+
+  const progress = downloadProgress.value
+  if (progress?.state === 'downloading' && progress.percentage >= 0) {
+    return `${progress.percentage}%`
+  }
+
+  if (progress?.state === 'extracting') return '解压中'
+  if (progress?.state === 'opening') return '打开中'
+  return '处理中'
+})
+
+const showMessage = (message: string, type: 'success' | 'error') => {
+  actionMessage.value = message
+  messageClass.value = type
+
+  if (messageTimer !== null) {
+    window.clearTimeout(messageTimer)
+  }
+
+  messageTimer = window.setTimeout(() => {
+    actionMessage.value = ''
+    messageTimer = null
+  }, 5000)
+}
+
+const handleOpenInGame = async () => {
+  if (isOpening.value) return
+
+  actionMessage.value = ''
+
+  if (!(await checkConnection())) {
+    openConnectionModal()
+    return
+  }
+
+  try {
+    const response = await openLevel({
+      levelId: props.level.id,
+      downloadUrl: ApiService.getAbsoluteDownloadUrl(props.level.id),
+      fileName: `${props.level.id}.rdzip`,
+    })
+    showMessage(response.message || '谱面已发送到游戏。', 'success')
+  } catch (error) {
+    if (error instanceof ModBridgeError && error.code === 'MOD_UNAVAILABLE') {
+      openConnectionModal()
+      return
+    }
+
+    showMessage(error instanceof Error ? error.message : '打开谱面失败，请稍后重试。', 'error')
+  }
 }
 
 const handleImageError = (e: Event) => {
@@ -255,6 +344,20 @@ const handleImageError = (e: Event) => {
   margin-top: auto;
 }
 
+.card-action-message {
+  margin-top: var(--spacing-sm);
+  font-size: 0.75rem;
+  line-height: 1.4;
+}
+
+.card-action-message.success {
+  color: var(--color-success);
+}
+
+.card-action-message.error {
+  color: var(--color-error);
+}
+
 .download-btn {
   flex: 1;
   display: flex;
@@ -291,5 +394,15 @@ const handleImageError = (e: Event) => {
 .download-btn svg {
   width: 16px;
   height: 16px;
+}
+
+.spinning {
+  animation: card-spin 0.8s linear infinite;
+}
+
+@keyframes card-spin {
+  to {
+    transform: rotate(360deg);
+  }
 }
 </style>
