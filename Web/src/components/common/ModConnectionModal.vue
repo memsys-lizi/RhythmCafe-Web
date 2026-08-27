@@ -54,6 +54,17 @@
         </ol>
       </div>
 
+      <a
+        class="mod-download-link"
+        :href="MOD_DOWNLOAD_URL"
+        target="_blank"
+        rel="noopener noreferrer"
+      >
+        <Download :size="17" aria-hidden="true" />
+        下载 RhythmCafe Bridge
+        <ExternalLink :size="15" aria-hidden="true" />
+      </a>
+
       <div class="mod-modal-actions">
         <button class="mod-retry-btn" type="button" :disabled="status === 'checking'" @click="retry">
           <RefreshCw :size="16" :class="{ spinning: status === 'checking' }" />
@@ -67,8 +78,8 @@
 
 <script setup lang="ts">
 import { computed } from 'vue'
-import { AlertCircle, CheckCircle2, RefreshCw, X } from 'lucide-vue-next'
-import { useModBridge } from '@/composables/useModBridge'
+import { AlertCircle, CheckCircle2, Download, ExternalLink, RefreshCw, X } from 'lucide-vue-next'
+import { MOD_DOWNLOAD_URL, useModBridge } from '@/composables/useModBridge'
 
 const {
   status,
@@ -227,6 +238,29 @@ const retry = async () => {
 .mod-modal-actions {
   gap: var(--spacing-sm);
   margin-top: var(--spacing-lg);
+}
+
+.mod-download-link {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: var(--spacing-xs);
+  width: 100%;
+  min-height: 40px;
+  padding: 0 var(--spacing-md);
+  color: var(--text-primary);
+  background: var(--bg-tertiary);
+  border: 1px solid var(--border-secondary);
+  border-radius: var(--radius-md);
+  font-size: 0.875rem;
+  font-weight: 600;
+  text-decoration: none;
+  transition: background-color var(--transition-fast), border-color var(--transition-fast);
+}
+
+.mod-download-link:hover {
+  background: var(--bg-hover);
+  border-color: var(--text-tertiary);
 }
 
 .mod-retry-btn,

@@ -2,6 +2,8 @@ import { computed, ref } from 'vue'
 
 export const MOD_BRIDGE_PORT = 2771
 export const MOD_BRIDGE_BASE_URL = `http://127.0.0.1:${MOD_BRIDGE_PORT}`
+export const MOD_DOWNLOAD_URL =
+  'https://github.com/memsys-lizi/RhythmCafe-Web/releases/latest/download/RhythmCafeBridge-v0.1.0.zip'
 
 export type ModConnectionStatus = 'unknown' | 'checking' | 'connected' | 'disconnected'
 export type ModProgressState =
