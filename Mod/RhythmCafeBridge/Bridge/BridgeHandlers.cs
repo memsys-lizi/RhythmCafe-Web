@@ -163,8 +163,13 @@ internal sealed class BridgeHandlers
             return BridgeResponse.Fail("GAME_NOT_READY", "游戏场景尚未准备好，请稍后重试。");
         }
 
+        // Rhythm Doctor routes both normal completion and pause-menu exit through
+        // scnBase.GoToLevelSelect(). Prepare the existing custom-level library
+        // flow for this website-opened session.
+        Main.Instance?.PrepareCustomLevelLibraryReturn();
+        scnBase.currentLevelSelect = GC.SceneCustomLevelSelect;
         scnBase.GoToLevelWithExternalPath(path);
-        Main.Instance?.Logger.LogInfo($"Opening Rhythm Cafe level {levelId}: {path}");
+        Main.Instance?.Logger.LogInfo($"Opening Rhythm Cafe level {levelId}: {path}; return to custom level library");
         return BridgeResponse.Ok("谱面已下载，正在进入游戏。", "opening");
     }
 

@@ -41,3 +41,4 @@ D:\Steam\steamapps\common\Rhythm Doctor\BepInEx\plugins\RhythmCafeBridge
 ```
 
 谱面会保存到当前用户的 `Documents/Rhythm Doctor/Levels` 目录。
+通过网站打开的谱面结束游玩或从暂停菜单退出后，游戏会沿用现有的返回流程回到 `scnCLS`，并自动打开其中的“关卡库”列表。
