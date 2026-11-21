@@ -128,7 +128,18 @@ function getCursorState(fingerprint: string): CursorState {
 function withFingerprintLock<T>(fingerprint: string, fn: () => Promise<T>): Promise<T> {
   const previous = inflight.get(fingerprint) ?? Promise.resolve()
   const run = previous.catch(() => undefined).then(fn)
-  inflight.set(fingerprint, run.then(() => undefined))
+  // 链尾必须吞掉 rejection，否则上游失败时这条派生 promise 无人处理，
+  // 会触发 unhandledRejection 导致 Node 进程直接退出
+  const tail = run.then(
+    () => undefined,
+    () => undefined
+  )
+  inflight.set(fingerprint, tail)
+  void tail.then(() => {
+    if (inflight.get(fingerprint) === tail) {
+      inflight.delete(fingerprint)
+    }
+  })
   return run
 }
 

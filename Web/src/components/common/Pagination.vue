@@ -38,7 +38,7 @@
       </div>
 
       <!-- 每页条数（始终显示，即使只有一页） -->
-      <label class="page-size-select">
+      <label v-if="showPageSize !== false" class="page-size-select">
         每页
         <select :value="pageSize" @change="handleSizeChange">
           <option
@@ -65,6 +65,7 @@ const props = defineProps<{
   maxVisible?: number
   pageSize?: number
   pageSizeOptions?: number[]
+  showPageSize?: boolean
 }>()
 
 const emit = defineEmits<{

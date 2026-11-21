@@ -32,8 +32,7 @@ export class ApiService {
   static async fetchLevels(
     page: number = 1,
     query: string = '',
-    filters: Filters,
-    perPage: number = 20
+    filters: Filters
   ): Promise<LevelSearchResult> {
     const params = new URLSearchParams()
     const normalizedQuery = query.trim()
@@ -43,7 +42,6 @@ export class ApiService {
     }
 
     params.set('page', String(page))
-    params.set('per_page', String(perPage))
     appendValues(params, 'tags_all', filters.tags)
     appendValues(params, 'authors_all', filters.authors)
     appendValues(params, 'artists_all', filters.artists)
@@ -64,7 +62,7 @@ export class ApiService {
       )
     }
 
-    const response = await fetch(`${API_BASE_URL}/levels/db?${params.toString()}`, {
+    const response = await fetch(`${API_BASE_URL}/levels?${params.toString()}`, {
       headers: {
         Accept: 'application/json'
       }
@@ -81,7 +79,7 @@ export class ApiService {
       throw new Error('API response has an unexpected shape')
     }
 
-    const pageSize = Number(results.limit) > 0 ? Number(results.limit) : 20
+    const pageSize = Number(results.limit) > 0 ? Number(results.limit) : 22
     const offset = Number(results.offset) >= 0 ? Number(results.offset) : 0
 
     return {
